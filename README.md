@@ -1,2 +1,2 @@
-# wordle-animated
+# wordle
 Created with CodeSandbox
