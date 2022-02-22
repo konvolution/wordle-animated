@@ -1,16 +1,63 @@
+import "./reset.css";
+import "./styles.css";
+
 import * as React from "react";
 import * as AppModel from "./appModel";
 import { Keyboard } from "./Keyboard";
 import { WordGrid } from "./WordGrid";
 
-import "./styles.css";
 import { answerWords } from "./data";
-
-const CollapseRevealAnimationTimeMS = 250;
 
 function getInitialWord() {
   return Math.floor(Date.now() / 86400000) % answerWords.length;
 }
+
+const gameSuccessMessage = [
+  "Genius",
+  "Magnificent",
+  "Impressive",
+  "Splendid",
+  "Great",
+  "Phew"
+];
+
+function getEndGameMessage(gameState: AppModel.GameState): string {
+  if (AppModel.selectGameWon(gameState)) {
+    return gameSuccessMessage[AppModel.selectGuesses(gameState).length - 1];
+  }
+
+  return "Sorry, you lost :(";
+}
+
+function getEndGameAriaLabel(gameState: AppModel.GameState): string {
+  if (AppModel.selectGameWon(gameState)) {
+    return "You guessed the word";
+  }
+
+  return "";
+}
+
+interface EndGameButtonProps {
+  onClick: () => void;
+  text: string;
+}
+
+const EndGameButton: React.FunctionComponent<EndGameButtonProps> = ({
+  onClick,
+  text
+}) => {
+  const refButton = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    refButton.current?.focus();
+  }, []);
+
+  return (
+    <button ref={refButton} className="appbutton" onClick={onClick}>
+      {text}
+    </button>
+  );
+};
 
 export default function App() {
   const [gameState, dispatch] = React.useReducer(
@@ -82,29 +129,45 @@ export default function App() {
         : AppModel.createResetGameAction()
     );
 
-  const animationStep = AppModel.selectAnimationStep(gameState);
-
   React.useEffect(() => {
-    const timerHandle = !animationStep
+    const timerHandle = !AppModel.selectAnimationStep(gameState)
       ? undefined
       : setTimeout(
           () => dispatch(AppModel.createAnimationStepAction()),
-          CollapseRevealAnimationTimeMS
+          AppModel.selectAnimationStepDurationMS(gameState)
         );
 
     return () => clearTimeout(timerHandle);
-  }, [animationStep]);
+  }, [gameState]);
+
+  const gameOver = AppModel.selectGameOver(gameState);
+  const showNextGameButton =
+    gameOver && !AppModel.selectAnimationStep(gameState);
 
   return (
     <div className="App">
       <h1>Wordle</h1>
       <div style={{ position: "relative" }}>
         <WordGrid gameState={gameState} />
-        {AppModel.selectGameOver(gameState) && (
+        {gameOver && (
+          <div className="gamemessagecontainer">
+            <div
+              role="alert"
+              className="gamemessage"
+              aria-label={getEndGameAriaLabel(gameState)}
+            >
+              {getEndGameMessage(gameState)}
+            </div>
+          </div>
+        )}
+        {showNextGameButton && (
           <div className="overlay">
-            <button className="appbutton" onClick={onClickNewGame}>
-              {AppModel.selectGameWon(gameState) ? "New game?" : "Try again?"}
-            </button>
+            <EndGameButton
+              onClick={onClickNewGame}
+              text={
+                AppModel.selectGameWon(gameState) ? "New game?" : "Try again?"
+              }
+            />
           </div>
         )}
       </div>

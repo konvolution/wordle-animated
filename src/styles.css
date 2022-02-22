@@ -9,6 +9,8 @@
   --color-text: black;
   --color-tile-hint: white;
   --color-button-shadow: black;
+  --color-message-background: black;
+  --color-message-text: white;
 }
 
 * {
@@ -131,6 +133,29 @@
   bottom: 0;
 }
 
+.gamemessagecontainer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gamemessage {
+  font-size: 16px;
+  border-radius: 4px;
+  border: none;
+  background-color: var(--color-message-background);
+  color: var(--color-message-text);
+  padding: 8px 12px;
+  animation-name: FadeOut;
+  animation-duration: 150ms;
+  animation-delay: 3s;
+  animation-fill-mode: forwards;
+}
+
 .appbutton {
   font-size: 16px;
   text-transform: capitalize;
@@ -216,5 +241,14 @@
   }
   100% {
     transform: rotateX(0);
+  }
+}
+
+@keyframes FadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }

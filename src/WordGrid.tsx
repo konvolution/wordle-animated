@@ -15,6 +15,31 @@ interface Cell {
   reveal?: boolean;
 }
 
+function hintToText(hint: AppModel.Hint): string {
+  switch (hint) {
+    case AppModel.Hint.CorrectPosition:
+      return "present in answer, and correct position";
+    case AppModel.Hint.WrongPosition:
+      return "present in answer, but wrong position";
+    case AppModel.Hint.WrongLetter:
+      return "not present in answer";
+    default:
+      return "";
+  }
+}
+
+function makeAriaLabel(row: Cell[], cell: Cell, index: number): string {
+  if (cell.invalidWord) {
+    return `Invalid word: ${row.map((r) => r.letter).join("")}`;
+  }
+
+  if (cell.hint) {
+    return `Letter, ${cell.letter}, ${hintToText(cell.hint)}`;
+  }
+
+  return "";
+}
+
 const emptyRow: Cell[] = Array(AppModel.WordLength).fill({});
 
 export const WordGrid: React.FunctionComponent<WordGridProps> = ({
@@ -39,12 +64,14 @@ export const WordGrid: React.FunctionComponent<WordGridProps> = ({
   ].slice(0, AppModel.MaxGuesses);
 
   return (
-    <div className="WordGrid">
+    <div role="grid" aria-readonly className="WordGrid">
       {grid.map((row, iRow) => (
-        <div key={iRow} className="row">
+        <div role="row" key={iRow} className="row">
           {row.map((cell, iCol) => (
             <div
+              role="cell"
               key={iCol}
+              aria-label={makeAriaLabel(row, cell, iCol)}
               className={[
                 "cell",
                 cell.invalidWord ? "invalid" : hintToClass(cell.hint),
