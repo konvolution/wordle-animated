@@ -3,6 +3,9 @@ import { answerWords, candidateWords } from "./data";
 export const WordLength = 5;
 export const MaxGuesses = 6;
 
+const CollapseRevealAnimationTimeMS = 250;
+const WaitBeforeNextGameButtonMS = 1000;
+
 export interface GameState {
   // Words previously guessed
   guesses: string[];
@@ -28,22 +31,32 @@ export enum ActionType {
 }
 
 export enum AnimationType {
-  RevealHints
+  RevealHints,
+  EndOfGame
 }
 
-type AnimationStep = RevealHintsAnimation;
+type AnimationStep = RevealHintsAnimation | EndOfGameAnimation;
 
 let animationTick = 0;
 function getNextAnimationTick(): number {
   return ++animationTick;
 }
 
-export interface RevealHintsAnimation {
+export interface AnimationStateBase {
+  type: AnimationType;
+  tick: number; // 1+
+  durationMS: number;
+}
+
+export interface RevealHintsAnimation extends AnimationStateBase {
   type: AnimationType.RevealHints;
 
-  tick: number; // 1+
   collapseIndex: number;
   revealIndex: number;
+}
+
+export interface EndOfGameAnimation extends AnimationStateBase {
+  type: AnimationType.EndOfGame;
 }
 
 //#region Action types
@@ -261,6 +274,10 @@ export function selectAnimationStep(state: GameState): number | undefined {
   return state.animationStep?.tick;
 }
 
+export function selectAnimationStepDurationMS(state: GameState): number {
+  return state.animationStep?.durationMS ?? CollapseRevealAnimationTimeMS;
+}
+
 export function selectCurrentGuess(state: GameState): string {
   return state.currentGuess;
 }
@@ -278,7 +295,7 @@ export function selectCurrentGuessViewState(
 ): CurrentGuessViewState[] {
   const { animationStep } = state;
 
-  if (!animationStep) {
+  if (animationStep?.type !== AnimationType.RevealHints) {
     const invalidWord =
       state.currentGuess.length === WordLength &&
       !isValidWord(state.currentGuess);
@@ -356,28 +373,57 @@ export function gameReducer(state: GameState, action: Action): GameState {
         return state;
       }
 
-      let collapseIndex = ++state.animationStep.collapseIndex;
-      let revealIndex = ++state.animationStep.revealIndex;
+      switch (state.animationStep.type) {
+        case AnimationType.RevealHints: {
+          let collapseIndex = ++state.animationStep.collapseIndex;
+          let revealIndex = ++state.animationStep.revealIndex;
 
-      if (revealIndex === WordLength) {
-        // Animation completed. Append guess and reset current guess
-        return {
-          ...state,
-          animationStep: undefined,
-          currentGuess: "",
-          guesses: [...state.guesses, state.currentGuess]
-        };
-      }
+          if (revealIndex === WordLength) {
+            // Animation completed. Append guess and reset current guess
+            const nextState = {
+              ...state,
+              animationStep: undefined,
+              currentGuess: "",
+              guesses: [...state.guesses, state.currentGuess]
+            };
 
-      return {
-        ...state,
-        animationStep: {
-          type: AnimationType.RevealHints,
-          tick: getNextAnimationTick(),
-          collapseIndex,
-          revealIndex
+            if (!selectGameOver(nextState)) {
+              return nextState;
+            }
+
+            return {
+              ...nextState,
+              animationStep: {
+                type: AnimationType.EndOfGame,
+                tick: getNextAnimationTick(),
+                durationMS: WaitBeforeNextGameButtonMS
+              }
+            };
+          }
+
+          return {
+            ...state,
+            animationStep: {
+              type: AnimationType.RevealHints,
+              tick: getNextAnimationTick(),
+              durationMS: CollapseRevealAnimationTimeMS,
+              collapseIndex,
+              revealIndex
+            }
+          };
         }
-      };
+
+        case AnimationType.EndOfGame: {
+          // Animation completed
+          return {
+            ...state,
+            animationStep: undefined
+          };
+        }
+
+        default:
+          return state;
+      }
     }
   }
 
@@ -391,6 +437,7 @@ export function gameReducer(state: GameState, action: Action): GameState {
     case ActionType.AppendLetter: {
       if (
         state.currentGuess.length < WordLength &&
+        action.letter.length === 1 &&
         action.letter >= "a" &&
         action.letter <= "z"
       ) {
@@ -419,6 +466,7 @@ export function gameReducer(state: GameState, action: Action): GameState {
           animationStep: {
             type: AnimationType.RevealHints,
             tick: getNextAnimationTick(),
+            durationMS: CollapseRevealAnimationTimeMS,
             collapseIndex: 0,
             revealIndex: -1
           }

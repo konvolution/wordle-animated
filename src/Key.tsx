@@ -13,6 +13,7 @@ export const Key: React.FunctionComponent<KeyProps> = ({
 }) => {
   let specialKeyClass: string | undefined;
   let keyLabel = letter;
+  let ariaLabel: string | undefined;
 
   switch (letter) {
     case "\r":
@@ -22,6 +23,7 @@ export const Key: React.FunctionComponent<KeyProps> = ({
     case `\b`:
       keyLabel = "\u232b";
       specialKeyClass = "backspace";
+      ariaLabel = "backspace";
       break;
   }
 
@@ -30,7 +32,7 @@ export const Key: React.FunctionComponent<KeyProps> = ({
     .join(" ");
 
   return (
-    <button className={aggregateClass} onClick={onPress}>
+    <button className={aggregateClass} onClick={onPress} aria-label={ariaLabel}>
       {keyLabel}
     </button>
   );
