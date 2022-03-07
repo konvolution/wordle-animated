@@ -333,6 +333,17 @@ export function selectGameWon(state: GameState): boolean {
   );
 }
 
+// Returns true if we're accepting user input, but the current word
+// is invalid. We should "shake" the word to show that the word is
+// not valid.
+export function selectSubmitSignalInvalid(state: GameState): boolean {
+  return (
+    !selectGameOver(state) &&
+    !state.animationStep &&
+    !isValidWord(state.currentGuess)
+  );
+}
+
 export const initialGameState: GameState = {
   guesses: [],
   currentGuess: "",

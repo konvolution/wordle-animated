@@ -4,7 +4,7 @@ import "./styles.css";
 import * as React from "react";
 import * as AppModel from "./appModel";
 import { Keyboard } from "./Keyboard";
-import { WordGrid } from "./WordGrid";
+import { IWordGrid, WordGrid } from "./WordGrid";
 
 import { answerWords } from "./data";
 
@@ -75,19 +75,29 @@ export default function App() {
     AppModel.selectTargetWord(gameState)
   );
 
-  const onPressKey = React.useCallback((key: string) => {
-    switch (key) {
-      case "\r":
-        dispatch(AppModel.createSubmitGuessAction());
-        break;
-      case "\b":
-        dispatch(AppModel.createRemoveLetterAction());
-        break;
-      default:
-        dispatch(AppModel.createAppendLetterAction(key));
-        break;
-    }
-  }, []);
+  const refWordGrid = React.useRef<IWordGrid>(null);
+
+  const onPressKey = React.useCallback(
+    (key: string) => {
+      switch (key) {
+        case "\r":
+          if (AppModel.selectSubmitSignalInvalid(gameState)) {
+            refWordGrid.current?.shake();
+          } else {
+            dispatch(AppModel.createSubmitGuessAction());
+          }
+
+          break;
+        case "\b":
+          dispatch(AppModel.createRemoveLetterAction());
+          break;
+        default:
+          dispatch(AppModel.createAppendLetterAction(key));
+          break;
+      }
+    },
+    [gameState]
+  );
 
   // Handle key press events at the document level
   React.useEffect(() => {
@@ -148,7 +158,7 @@ export default function App() {
     <div className="App">
       <h1>Wordle</h1>
       <div style={{ position: "relative" }}>
-        <WordGrid gameState={gameState} />
+        <WordGrid ref={refWordGrid} gameState={gameState} />
         {gameOver && (
           <div className="gamemessagecontainer">
             <div
