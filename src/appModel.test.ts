@@ -97,3 +97,15 @@ describe("Selector tests", () => {
     expect(AppModel.selectGameOver(currentState)).toBe(true);
   });
 });
+
+describe("Calculate hints tests", () => {
+  it("calculateHints with {guess: 'store', targetWord: 'drool'} marks 'o' in correct place", () => {
+    expect(AppModel.calculateHints("store", "drool")).toEqual([
+      AppModel.Hint.WrongLetter,
+      AppModel.Hint.WrongLetter,
+      AppModel.Hint.CorrectPosition,
+      AppModel.Hint.WrongPosition,
+      AppModel.Hint.WrongLetter
+    ]);
+  });
+});
