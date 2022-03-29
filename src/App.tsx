@@ -81,7 +81,7 @@ export default function App() {
     (key: string) => {
       switch (key) {
         case "\r":
-          if (AppModel.selectSubmitSignalInvalid(gameState)) {
+          if (AppModel.selectSubmitInvalidWord(gameState)) {
             refWordGrid.current?.shake();
           } else {
             dispatch(AppModel.createSubmitGuessAction());

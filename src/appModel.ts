@@ -15,9 +15,13 @@ export interface GameState {
 
   // Answer word
   answerWordIndex: number;
+}
 
+export interface GameAnimation {
   animationStep?: AnimationStep;
 }
+
+export type GameStateWithAnimation = GameState & GameAnimation;
 
 export enum ActionType {
   Noop = "Noop", // Do nothing
@@ -270,11 +274,11 @@ export function selectGuesses(state: GameState): string[] {
   return state.guesses;
 }
 
-export function selectAnimationStep(state: GameState): number | undefined {
+export function selectAnimationStep(state: GameAnimation): number | undefined {
   return state.animationStep?.tick;
 }
 
-export function selectAnimationStepDurationMS(state: GameState): number {
+export function selectAnimationStepDurationMS(state: GameAnimation): number {
   return state.animationStep?.durationMS ?? CollapseRevealAnimationTimeMS;
 }
 
@@ -291,7 +295,7 @@ export interface CurrentGuessViewState {
 }
 
 export function selectCurrentGuessViewState(
-  state: GameState
+  state: GameStateWithAnimation
 ): CurrentGuessViewState[] {
   const { animationStep } = state;
 
@@ -336,7 +340,9 @@ export function selectGameWon(state: GameState): boolean {
 // Returns true if we're accepting user input, but the current word
 // is invalid. We should "shake" the word to show that the word is
 // not valid.
-export function selectSubmitSignalInvalid(state: GameState): boolean {
+export function selectSubmitInvalidWord(
+  state: GameStateWithAnimation
+): boolean {
   return (
     !selectGameOver(state) &&
     !state.animationStep &&
@@ -350,7 +356,8 @@ export const initialGameState: GameState = {
   answerWordIndex: 0
 };
 
-export function gameReducer(state: GameState, action: Action): GameState {
+// Function performs game logic without any concern for animation
+export function gameLogicReducer(state: GameState, action: Action): GameState {
   // Actions permitted in any state
   switch (action.type) {
     case ActionType.StartGame: {
@@ -377,68 +384,9 @@ export function gameReducer(state: GameState, action: Action): GameState {
         ...initialGameState,
         answerWordIndex: (state.answerWordIndex + 1) % answerWords.length
       };
-
-    case ActionType.AnimationStep: {
-      if (!state.animationStep) {
-        // Unexpected state
-        return state;
-      }
-
-      switch (state.animationStep.type) {
-        case AnimationType.RevealHints: {
-          let collapseIndex = ++state.animationStep.collapseIndex;
-          let revealIndex = ++state.animationStep.revealIndex;
-
-          if (revealIndex === WordLength) {
-            // Animation completed. Append guess and reset current guess
-            const nextState = {
-              ...state,
-              animationStep: undefined,
-              currentGuess: "",
-              guesses: [...state.guesses, state.currentGuess]
-            };
-
-            if (!selectGameOver(nextState)) {
-              return nextState;
-            }
-
-            return {
-              ...nextState,
-              animationStep: {
-                type: AnimationType.EndOfGame,
-                tick: getNextAnimationTick(),
-                durationMS: WaitBeforeNextGameButtonMS
-              }
-            };
-          }
-
-          return {
-            ...state,
-            animationStep: {
-              type: AnimationType.RevealHints,
-              tick: getNextAnimationTick(),
-              durationMS: CollapseRevealAnimationTimeMS,
-              collapseIndex,
-              revealIndex
-            }
-          };
-        }
-
-        case AnimationType.EndOfGame: {
-          // Animation completed
-          return {
-            ...state,
-            animationStep: undefined
-          };
-        }
-
-        default:
-          return state;
-      }
-    }
   }
 
-  if (selectGameOver(state) || state.animationStep) {
+  if (selectGameOver(state)) {
     return state;
   }
 
@@ -474,13 +422,8 @@ export function gameReducer(state: GameState, action: Action): GameState {
       if (isValidWord(state.currentGuess)) {
         return {
           ...state,
-          animationStep: {
-            type: AnimationType.RevealHints,
-            tick: getNextAnimationTick(),
-            durationMS: CollapseRevealAnimationTimeMS,
-            collapseIndex: 0,
-            revealIndex: -1
-          }
+          currentGuess: "",
+          guesses: [...state.guesses, state.currentGuess]
         };
       }
 
@@ -489,4 +432,96 @@ export function gameReducer(state: GameState, action: Action): GameState {
   }
 
   return state;
+}
+
+// Game reducer function.
+// - Uses gameLogicReducer to perform game logic.
+// - Intercepts SubmitGuess action to perform animation state
+//   transitions before finally submitting the guess to gameLogicReducer
+//   to calculate the next logical state
+export function gameReducer(
+  state: GameStateWithAnimation,
+  action: Action
+): GameStateWithAnimation {
+  if (state.animationStep) {
+    // The only action permitted while animation is in progress is an animation step
+    if (action.type !== ActionType.AnimationStep) {
+      return state;
+    }
+
+    // Do animation state transition
+    switch (state.animationStep.type) {
+      case AnimationType.RevealHints: {
+        let collapseIndex = ++state.animationStep.collapseIndex;
+        let revealIndex = ++state.animationStep.revealIndex;
+
+        if (revealIndex === WordLength) {
+          // Animation completed. Submit guess to game logic
+          const nextState = gameLogicReducer(state, createSubmitGuessAction());
+
+          if (!selectGameOver(nextState)) {
+            return {
+              ...nextState,
+              animationStep: undefined
+            };
+          }
+
+          return {
+            ...nextState,
+            animationStep: {
+              type: AnimationType.EndOfGame,
+              tick: getNextAnimationTick(),
+              durationMS: WaitBeforeNextGameButtonMS
+            }
+          };
+        }
+
+        return {
+          ...state,
+          animationStep: {
+            type: AnimationType.RevealHints,
+            tick: getNextAnimationTick(),
+            durationMS: CollapseRevealAnimationTimeMS,
+            collapseIndex,
+            revealIndex
+          }
+        };
+      }
+
+      case AnimationType.EndOfGame: {
+        // Animation completed
+        return {
+          ...state,
+          animationStep: undefined
+        };
+      }
+
+      default:
+        return state;
+    }
+
+    // Not reachable
+  }
+
+  // No animation in progress. If submit guess action, then, trigger reveal
+  // animation if game is in progress and the current guess is a valid word
+  if (
+    action.type === ActionType.SubmitGuess &&
+    !selectGameOver(state) &&
+    isValidWord(state.currentGuess)
+  ) {
+    return {
+      ...state,
+      animationStep: {
+        type: AnimationType.RevealHints,
+        tick: getNextAnimationTick(),
+        durationMS: CollapseRevealAnimationTimeMS,
+        collapseIndex: 0,
+        revealIndex: -1
+      }
+    };
+  }
+
+  // Run game logic
+  return gameLogicReducer(state, action);
 }
